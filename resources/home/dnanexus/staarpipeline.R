@@ -162,7 +162,7 @@ if(test.type == "Null") {
   genofile <- seqOpen(agds.file)
 
   ## gene number in job
-  gene_num_in_array <- 50
+  gene_num_in_array <- 200
   group.num.allchr <- ceiling(table(genes_info[,2])/gene_num_in_array)
   sum(group.num.allchr)
   ## Chr
@@ -215,7 +215,7 @@ if(test.type == "Null") {
   genofile <- seqOpen(agds.file)
 
   ## gene number in job
-  gene_num_in_array <- 50
+  gene_num_in_array <- 200
   group.num.allchr <- ceiling(table(genes_info[,2])/gene_num_in_array)
   sum(group.num.allchr)
   ## Chr
@@ -272,7 +272,7 @@ if(test.type == "Null") {
   genofile <- seqOpen(agds.file)
 
   ## gene number in job
-  gene_num_in_array <- 50
+  gene_num_in_array <- 200
   group.num.allchr <- ceiling(table(genes_info[,2])/gene_num_in_array)
   sum(group.num.allchr)
   ## Chr
