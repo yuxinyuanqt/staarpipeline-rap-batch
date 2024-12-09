@@ -762,35 +762,37 @@ if(test.type == "Null") {
 
   ## jobs_num
   jobs_num <- matrix(rep(0,66),nrow=22)
-
-  filter <- seqGetData(genofile, QC_label)
-  SNVlist <- filter == "PASS"
-
-  position <- as.numeric(seqGetData(genofile, "position"))
-  position_SNV <- position[SNVlist]
-
-  jobs_num[chr,1] <- chr
-  jobs_num[chr,2] <- min(position[SNVlist])
-  jobs_num[chr,3] <- max(position[SNVlist])
+  jobs_num[,1] <- c(1:22)
+  jobs_num[,2] <- c(10001,10001,10001,10001,10001,
+                    60001,10001,60001,10001,10001,
+                    60001,10001,16000001,16000001,17000001,
+                    10001,60001,10001,60001,60001,
+                    5010001,10510001)
+  jobs_num[,3] <- c(248946422,242183529,198235559,190204555,181478259,
+                    170745979,159335973,145078636,138334717,133787422,
+                    135076622,133265309,114354328,106883718,101981189,
+                    90228345,83247441,80263285,58607616,64334167,
+                    46699983,50808468)
 
   colnames(jobs_num) <- c("chr","start_loc","end_loc")
   jobs_num <- as.data.frame(jobs_num)
 
   ## start_loc and end_loc
-  start_loc <- jobs_num$start_loc[chr]
-  end_loc <- start_loc + 0.5e6 - 1
+  start_loc <- (arrayid-1)*10e6 + jobs_num$start_loc[chr]
+  end_loc <- start_loc + 10e6 - 1
+  end_loc <- min(end_loc,jobs_num$end_loc[chr])
 
   ## sub-sequence num
-  sub_seq_num <- ceiling((jobs_num$end_loc[chr] - jobs_num$start_loc[chr] + 1)/0.5e6)
+  sub_seq_num <- ceiling((end_loc - start_loc + 1)/0.25e6)
   sub_seq_id <- 1:sub_seq_num
 
   individual_analysis_dnanexus <- function(kk,chr,start_loc,end_loc,genofile,obj_nullmodel,mac_cutoff,subset_variants_num,
                                            QC_label,variant_type,geno_missing_imputation)
   {
-    start_loc_sub <- start_loc + 0.5e6*(kk-1)
-    end_loc_sub <- end_loc + 0.5e6*(kk-1)
+    start_loc_sub <- start_loc + 0.25e6*(kk-1)
+    end_loc_sub <- start_loc_sub + 0.25e6 - 1
 
-    end_loc_sub <- min(end_loc_sub,jobs_num$end_loc[chr])
+    end_loc_sub <- min(end_loc_sub,end_loc)
 
     results <- try(Individual_Analysis(chr=chr,start_loc=start_loc_sub,end_loc=end_loc_sub,genofile=genofile,obj_nullmodel=obj_nullmodel,mac_cutoff=mac_cutoff,subset_variants_num=subset_variants_num,
                                        QC_label=QC_label,variant_type=variant_type,geno_missing_imputation=geno_missing_imputation))
