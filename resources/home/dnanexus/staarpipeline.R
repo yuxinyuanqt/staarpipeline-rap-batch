@@ -196,11 +196,51 @@ if(test.type == "Null") {
     return(results)
   }
 
-  out <- mclapply(sub_seq_id,gene_centric_coding_dnanexus,genes_info_chr=genes_info_chr,chr=chr,genofile=genofile,obj_nullmodel=nullobj,rare_maf_cutoff=max.maf,
-                  rv_num_cutoff=min.rv.num,rv_num_cutoff_max=max.rv.num,rv_num_cutoff_max_prefilter=max.rv.num.prefilter,
-                  QC_label=QC_label,variant_type=variant_type,geno_missing_imputation=geno_missing_imputation,
-                  Annotation_dir=Annotation_dir,Annotation_name_catalog=Annotation_name_catalog,
-                  Use_annotation_weights=Use_annotation_weights,Annotation_name=Annotation_name,silent=TRUE,mc.cores=user_cores)
+  retry_mclapply <- function(sub_seq_id, user_cores, max_iter = 10) 
+  {
+    out <- list()
+    current_cores <- user_cores
+    
+    for (iter in seq_len(max_iter))
+    {
+      message(paste0("Iteration ", iter, ": Running with ", current_cores, " cores. Remaining tasks: ", length(sub_seq_id)))
+      
+      tmp_out <- mclapply(sub_seq_id,gene_centric_coding_dnanexus,genes_info_chr=genes_info_chr,chr=chr,genofile=genofile,obj_nullmodel=nullobj,rare_maf_cutoff=max.maf,
+                          rv_num_cutoff=min.rv.num,rv_num_cutoff_max=max.rv.num,rv_num_cutoff_max_prefilter=max.rv.num.prefilter,
+                          QC_label=QC_label,variant_type=variant_type,geno_missing_imputation=geno_missing_imputation,
+                          Annotation_dir=Annotation_dir,Annotation_name_catalog=Annotation_name_catalog,
+                          Use_annotation_weights=Use_annotation_weights,Annotation_name=Annotation_name,silent=TRUE,mc.cores=current_cores)
+      gc()
+      
+      # Filter out NULL components and add results to the output
+      valid_indices <- !sapply(tmp_out, is.null)
+      out <- c(out, tmp_out[valid_indices])
+      
+      # Identify failed tasks (NULL components)
+      failed_indices <- sapply(tmp_out, is.null)
+      sub_seq_id <- sub_seq_id[failed_indices]
+      
+      if (length(sub_seq_id) == 0) 
+      {
+        message("All tasks completed successfully.")
+        break
+      }
+      
+      if (mean(failed_indices) > 0.9) 
+      {
+        warning("More than 90% of tasks failed in this iteration. Stopping to avoid potential infinite loop.")
+        break
+      }
+      
+      current_failed_count <- sum(failed_indices)
+      current_cores <- min(user_cores, current_failed_count)
+      
+      message(paste0(current_failed_count, " tasks failed. Retrying with ", current_cores, " cores."))
+    }
+    return(out)
+  }
+  
+  out <- retry_mclapply(sub_seq_id = sub_seq_id, user_cores = user_cores, max_iter = 10)
 
   rm(list=setdiff(ls(), c("out", "outfile"))); gc()
   save(out, file = paste0(outfile, ".Rdata"))
@@ -249,11 +289,51 @@ if(test.type == "Null") {
     return(results)
   }
 
-  out <- mclapply(sub_seq_id,gene_centric_coding_incl_ptv_dnanexus,genes_info_chr=genes_info_chr,chr=chr,genofile=genofile,obj_nullmodel=nullobj,rare_maf_cutoff=max.maf,
-                  rv_num_cutoff=min.rv.num,rv_num_cutoff_max=max.rv.num,rv_num_cutoff_max_prefilter=max.rv.num.prefilter,
-                  QC_label=QC_label,variant_type=variant_type,geno_missing_imputation=geno_missing_imputation,
-                  Annotation_dir=Annotation_dir,Annotation_name_catalog=Annotation_name_catalog,
-                  Use_annotation_weights=Use_annotation_weights,Annotation_name=Annotation_name,silent=TRUE,mc.cores=user_cores)
+  retry_mclapply <- function(sub_seq_id, user_cores, max_iter = 10) 
+  {
+    out <- list()
+    current_cores <- user_cores
+    
+    for (iter in seq_len(max_iter))
+    {
+      message(paste0("Iteration ", iter, ": Running with ", current_cores, " cores. Remaining tasks: ", length(sub_seq_id)))
+      
+      tmp_out <- mclapply(sub_seq_id,gene_centric_coding_incl_ptv_dnanexus,genes_info_chr=genes_info_chr,chr=chr,genofile=genofile,obj_nullmodel=nullobj,rare_maf_cutoff=max.maf,
+                          rv_num_cutoff=min.rv.num,rv_num_cutoff_max=max.rv.num,rv_num_cutoff_max_prefilter=max.rv.num.prefilter,
+                          QC_label=QC_label,variant_type=variant_type,geno_missing_imputation=geno_missing_imputation,
+                          Annotation_dir=Annotation_dir,Annotation_name_catalog=Annotation_name_catalog,
+                          Use_annotation_weights=Use_annotation_weights,Annotation_name=Annotation_name,silent=TRUE,mc.cores=current_cores)
+      gc()
+      
+      # Filter out NULL components and add results to the output
+      valid_indices <- !sapply(tmp_out, is.null)
+      out <- c(out, tmp_out[valid_indices])
+      
+      # Identify failed tasks (NULL components)
+      failed_indices <- sapply(tmp_out, is.null)
+      sub_seq_id <- sub_seq_id[failed_indices]
+      
+      if (length(sub_seq_id) == 0) 
+      {
+        message("All tasks completed successfully.")
+        break
+      }
+      
+      if (mean(failed_indices) > 0.9) 
+      {
+        warning("More than 90% of tasks failed in this iteration. Stopping to avoid potential infinite loop.")
+        break
+      }
+      
+      current_failed_count <- sum(failed_indices)
+      current_cores <- min(user_cores, current_failed_count)
+      
+      message(paste0(current_failed_count, " tasks failed. Retrying with ", current_cores, " cores."))
+    }
+    return(out)
+  }
+  
+  out <- retry_mclapply(sub_seq_id = sub_seq_id, user_cores = user_cores, max_iter = 10)
 
   rm(list=setdiff(ls(), c("out", "outfile"))); gc()
   save(out, file = paste0(outfile, ".Rdata"))
@@ -546,16 +626,56 @@ if(test.type == "Null") {
   rm(dfHancerrOCRsVarGene)
   gc()
 
-  out <- mclapply(sub_seq_id,gene_centric_noncoding_dnanexus,genes_info_chr=genes_info_chr,chr=chr,genofile=genofile,obj_nullmodel=nullobj,
-                  dfPromCAGEVarGene.SNV=dfPromCAGEVarGene.SNV,variant.id.SNV.PromCAGE=variant.id.SNV.PromCAGE,
-                  dfPromrOCRsVarGene.SNV=dfPromrOCRsVarGene.SNV,variant.id.SNV.PromrOCRs=variant.id.SNV.PromrOCRs,
-                  dfHancerCAGEVarGene.SNV=dfHancerCAGEVarGene.SNV,variant.id.SNV.HancerCAGE=variant.id.SNV.HancerCAGE,
-                  dfHancerrOCRsVarGene.SNV=dfHancerrOCRsVarGene.SNV,variant.id.SNV.HancerrOCRs=variant.id.SNV.HancerrOCRs,
-                  rare_maf_cutoff=max.maf,rv_num_cutoff=min.rv.num,
-                  rv_num_cutoff_max=max.rv.num,rv_num_cutoff_max_prefilter=max.rv.num.prefilter,
-                  QC_label=QC_label,variant_type=variant_type,geno_missing_imputation=geno_missing_imputation,
-                  Annotation_dir=Annotation_dir,Annotation_name_catalog=Annotation_name_catalog,
-                  Use_annotation_weights=Use_annotation_weights,Annotation_name=Annotation_name,silent=TRUE,mc.cores=user_cores)
+  retry_mclapply <- function(sub_seq_id, user_cores, max_iter = 10) 
+  {
+    out <- list()
+    current_cores <- user_cores
+    
+    for (iter in seq_len(max_iter))
+    {
+      message(paste0("Iteration ", iter, ": Running with ", current_cores, " cores. Remaining tasks: ", length(sub_seq_id)))
+      
+      tmp_out <- mclapply(sub_seq_id,gene_centric_noncoding_dnanexus,genes_info_chr=genes_info_chr,chr=chr,genofile=genofile,obj_nullmodel=nullobj,
+                          dfPromCAGEVarGene.SNV=dfPromCAGEVarGene.SNV,variant.id.SNV.PromCAGE=variant.id.SNV.PromCAGE,
+                          dfPromrOCRsVarGene.SNV=dfPromrOCRsVarGene.SNV,variant.id.SNV.PromrOCRs=variant.id.SNV.PromrOCRs,
+                          dfHancerCAGEVarGene.SNV=dfHancerCAGEVarGene.SNV,variant.id.SNV.HancerCAGE=variant.id.SNV.HancerCAGE,
+                          dfHancerrOCRsVarGene.SNV=dfHancerrOCRsVarGene.SNV,variant.id.SNV.HancerrOCRs=variant.id.SNV.HancerrOCRs,
+                          rare_maf_cutoff=max.maf,rv_num_cutoff=min.rv.num,
+                          rv_num_cutoff_max=max.rv.num,rv_num_cutoff_max_prefilter=max.rv.num.prefilter,
+                          QC_label=QC_label,variant_type=variant_type,geno_missing_imputation=geno_missing_imputation,
+                          Annotation_dir=Annotation_dir,Annotation_name_catalog=Annotation_name_catalog,
+                          Use_annotation_weights=Use_annotation_weights,Annotation_name=Annotation_name,silent=TRUE,mc.cores=current_cores)
+      gc()
+      
+      # Filter out NULL components and add results to the output
+      valid_indices <- !sapply(tmp_out, is.null)
+      out <- c(out, tmp_out[valid_indices])
+      
+      # Identify failed tasks (NULL components)
+      failed_indices <- sapply(tmp_out, is.null)
+      sub_seq_id <- sub_seq_id[failed_indices]
+      
+      if (length(sub_seq_id) == 0) 
+      {
+        message("All tasks completed successfully.")
+        break
+      }
+      
+      if (mean(failed_indices) > 0.9) 
+      {
+        warning("More than 90% of tasks failed in this iteration. Stopping to avoid potential infinite loop.")
+        break
+      }
+      
+      current_failed_count <- sum(failed_indices)
+      current_cores <- min(user_cores, current_failed_count)
+      
+      message(paste0(current_failed_count, " tasks failed. Retrying with ", current_cores, " cores."))
+    }
+    return(out)
+  }
+  
+  out <- retry_mclapply(sub_seq_id = sub_seq_id, user_cores = user_cores, max_iter = 10)
 
   rm(list=setdiff(ls(), c("out", "outfile"))); gc()
   save(out, file = paste0(outfile, ".Rdata"))
@@ -791,17 +911,59 @@ if(test.type == "Null") {
   {
     start_loc_sub <- start_loc + 0.25e6*(kk-1)
     end_loc_sub <- start_loc_sub + 0.25e6 - 1
-
+    
     end_loc_sub <- min(end_loc_sub,end_loc)
-
+    
     results <- try(Individual_Analysis(chr=chr,start_loc=start_loc_sub,end_loc=end_loc_sub,genofile=genofile,obj_nullmodel=obj_nullmodel,mac_cutoff=mac_cutoff,subset_variants_num=subset_variants_num,
                                        QC_label=QC_label,variant_type=variant_type,geno_missing_imputation=geno_missing_imputation))
-    return(results)
+    return(list(index=kk,results=results))
   }
-
+  
   subset_variants_num <- 5e3
-  out <- mclapply(sub_seq_id,individual_analysis_dnanexus,chr=chr,start_loc=start_loc,end_loc=end_loc,genofile=genofile,obj_nullmodel=nullobj,mac_cutoff=min.mac,subset_variants_num=subset_variants_num,
-                  QC_label=QC_label,variant_type=variant_type,geno_missing_imputation=geno_missing_imputation,mc.cores=user_cores)
+  
+  retry_mclapply <- function(sub_seq_id, user_cores, max_iter = 10) 
+  {
+    out <- list()
+    current_cores <- user_cores
+    
+    for (iter in seq_len(max_iter))
+    {
+      message(paste0("Iteration ", iter, ": Running with ", current_cores, " cores. Remaining tasks: ", length(sub_seq_id)))
+      
+      tmp_out <- mclapply(sub_seq_id,individual_analysis_dnanexus,chr=chr,start_loc=start_loc,end_loc=end_loc,genofile=genofile,obj_nullmodel=nullobj,mac_cutoff=min.mac,subset_variants_num=subset_variants_num,
+                          QC_label=QC_label,variant_type=variant_type,geno_missing_imputation=geno_missing_imputation,mc.cores=current_cores)
+      gc()
+      
+      # Filter out NULL components and add results to the output
+      valid_indices <- !sapply(tmp_out, is.null)
+      out <- c(out, tmp_out[valid_indices])
+      
+      # Identify failed tasks (NULL components)
+      failed_indices <- sapply(tmp_out, is.null)
+      sub_seq_id <- sub_seq_id[failed_indices]
+      
+      if (length(sub_seq_id) == 0) 
+      {
+        message("All tasks completed successfully.")
+        break
+      }
+      
+      if (mean(failed_indices) > 0.9) 
+      {
+        warning("More than 90% of tasks failed in this iteration. Stopping to avoid potential infinite loop.")
+        break
+      }
+      
+      current_failed_count <- sum(failed_indices)
+      current_cores <- min(user_cores, current_failed_count)
+      
+      message(paste0(current_failed_count, " tasks failed. Retrying with ", current_cores, " cores."))
+    }
+    return(out)
+  }
+  
+  out_results <- retry_mclapply(sub_seq_id = sub_seq_id, user_cores = user_cores, max_iter = 10)
+  out <- lapply(out_results, function(x) x$results)
 
   rm(list=setdiff(ls(), c("out", "outfile"))); gc()
   save(out, file = paste0(outfile, ".Rdata"))
