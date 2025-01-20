@@ -23,15 +23,15 @@ To acquire the staarpipeline applet, you will need to compile this applet for yo
 1. Clone this github repo to some directory:
 
 ```commandline
-git clone https://github.com/li-lab-genetics/staarpipeline-rap.git
+git clone https://github.com/li-lab-genetics/staarpipeline-rap-batch.git
 ```
 
-This will create a folder named staarpipeline-rap, you can then:
+This will create a folder named staarpipeline-rap-batch, you can then:
 
 2. Compile the source code:
 
 ```commandline
-dx build -f staarpipeline-rap
+dx build -f staarpipeline-rap-batch
 ```
 
 the `-f` flag just tells DNANexus to overwrite older versions of the applet within the same project if it is already there.
