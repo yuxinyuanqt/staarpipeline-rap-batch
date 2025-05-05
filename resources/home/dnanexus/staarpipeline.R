@@ -27,8 +27,8 @@ geno_missing_imputation <- args[23]
 Annotation_dir <- args[24]
 Use_annotation_weights <- args[25]
 Annotation_name <- args[26]
-p_filter_cutoff <- args[27]
-subset_variants_num <- args[28]
+p_filter_cutoff <- as.numeric(args[27])
+subset_variants_num <- as.numeric(args[28])
 
 test.type.vals <- c("Null", "Single", "Gene_Centric_Coding", "Gene_Centric_Coding_incl_ptv", "Gene_Centric_Noncoding", "ncRNA", "Sliding_Window", "SCANG")
 if(!test.type %in% test.type.vals) stop("Error: test.type must be Null, Single, Gene_Centric_Coding, Gene_Centric_Coding_incl_ptv, Gene_Centric_Noncoding, ncRNA, Sliding_Window, or SCANG")
@@ -991,7 +991,7 @@ if(test.type == "Null") {
       message(paste0("Iteration ", iter, ": Running with ", current_cores, " cores. Remaining tasks: ", length(sub_seq_id)))
       
       tmp_out <- mclapply(sub_seq_id,individual_analysis_dnanexus,chr=chr,start_loc=start_loc,end_loc=end_loc,genofile=genofile,obj_nullmodel=nullobj,mac_cutoff=min.mac,subset_variants_num=subset_variants_num,
-                          QC_label=QC_label,variant_type=variant_type,geno_missing_imputation=geno_missing_imputation,,p_filter_cutoff=p_filter_cutoff,mc.cores=current_cores)
+                          QC_label=QC_label,variant_type=variant_type,geno_missing_imputation=geno_missing_imputation,p_filter_cutoff=p_filter_cutoff,mc.cores=current_cores)
       gc()
       
       # Filter out NULL components and add results to the output
