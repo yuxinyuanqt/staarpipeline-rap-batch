@@ -27,6 +27,8 @@ geno_missing_imputation <- args[23]
 Annotation_dir <- args[24]
 Use_annotation_weights <- args[25]
 Annotation_name <- args[26]
+p_filter_cutoff <- as.numeric(args[27])
+subset_variants_num <- as.numeric(args[28])
 
 test.type.vals <- c("Null", "Single", "Gene_Centric_Coding", "Gene_Centric_Coding_incl_ptv", "Gene_Centric_Noncoding", "ncRNA", "Sliding_Window", "SCANG")
 if(!test.type %in% test.type.vals) stop("Error: test.type must be Null, Single, Gene_Centric_Coding, Gene_Centric_Coding_incl_ptv, Gene_Centric_Noncoding, ncRNA, Sliding_Window, or SCANG")
@@ -54,6 +56,8 @@ if(test.type == "Null") {
   cat("\tUser requested running the analysis on", user_cores, "cores\n")
   cat("\tThe specific array id used for analysis:", arrayid, "\n")
   cat("\tMinimum minor allele count to be included for single variant test:", min.mac, "\n")
+  cat("Threshold for p-value recalculation using the SPA method in single variant analysis:", p_filter_cutoff, "\n")
+  cat("The number of variants to run per subset for each time in single variant analysis:", subset_variants_num, "\n")
   cat("\tMaximum minor allele frequency to be included for variant-set test:", max.maf, "\n")
   cat("\tMinimum number of variants of analyzing a given variant-set:", min.rv.num, "\n")
   cat("\tMaximum number of variants of analyzing a given variant-set:", max.rv.num, "\n")
@@ -76,6 +80,8 @@ if(test.type == "Null") {
   cat("User requested running the analysis on", user_cores, "cores\n")
   cat("\tThe specific array id used for analysis:", arrayid, "\n")
   cat("Minimum minor allele count to be included for single variant test:", min.mac, "\n")
+  cat("Threshold for p-value recalculation using the SPA method in single variant analysis:", p_filter_cutoff, "\n")
+  cat("The number of variants to run per subset for each time in single variant analysis:", subset_variants_num, "\n")
   cat("Maximum minor allele frequency to be included for variant-set test:", max.maf, "\n")
   cat("\tMinimum number of variants of analyzing a given variant-set:", min.rv.num, "\n")
   cat("\tMaximum number of variants of analyzing a given variant-set:", max.rv.num, "\n")
@@ -97,7 +103,19 @@ if(test.type == "Null") {
   cat("\tTime variable in random slope longitudinal models:", random_time_slope, "\n")
 }
 
-if(user_cores > 1) Sys.setenv(MKL_NUM_THREADS = 1)
+if(user_cores > 1) 
+{
+  if (!requireNamespace("RhpcBLASctl", quietly = TRUE)) 
+  {
+    install.packages("RhpcBLASctl", repos = "http://cran.us.r-project.org")
+  }
+  suppressMessages(library(RhpcBLASctl))
+  blas_set_num_threads(1)
+  omp_set_num_threads(1)
+  Sys.setenv(MKL_NUM_THREADS = 1)
+  Sys.setenv(OMP_NUM_THREADS = 1)
+  print(parallel::mclapply(1:10, function(x) system("echo $OMP_NUM_THREADS", intern = TRUE), mc.cores = 10))
+}
 suppressMessages(library(gdsfmt))
 suppressMessages(library(SeqArray))
 suppressMessages(library(SeqVarTools))
@@ -162,7 +180,7 @@ if(test.type == "Null") {
   genofile <- seqOpen(agds.file)
 
   ## gene number in job
-  gene_num_in_array <- 400
+  gene_num_in_array <- 120
   group.num.allchr <- ceiling(table(genes_info[,2])/gene_num_in_array)
   sum(group.num.allchr)
   ## Chr
@@ -256,7 +274,7 @@ if(test.type == "Null") {
   genofile <- seqOpen(agds.file)
 
   ## gene number in job
-  gene_num_in_array <- 400
+  gene_num_in_array <- 120
   group.num.allchr <- ceiling(table(genes_info[,2])/gene_num_in_array)
   sum(group.num.allchr)
   ## Chr
@@ -915,7 +933,7 @@ if(test.type == "Null") {
   cat("\tChannel name of the annotations in the AGDS file:", Annotation_dir, "\n")
   cat("\tUse annotations as weights or not:", Use_annotation_weights, "\n")
   cat("\tAnnotations used in STAAR:", Annotation_name, "\n")
-  rm(list=setdiff(ls(), c("outfile", "nullobj", "agds.file", "min.mac", "QC_label", "variant_type", "geno_missing_imputation", "user_cores", "arrayid"))); gc()
+  rm(list=setdiff(ls(), c("outfile", "nullobj", "agds.file", "min.mac", "QC_label", "variant_type", "geno_missing_imputation", "user_cores", "arrayid","p_filter_cutoff","subset_variants_num"))); gc()
 
   genofile <- seqOpen(agds.file)
 
@@ -942,8 +960,8 @@ if(test.type == "Null") {
   jobs_num <- as.data.frame(jobs_num)
 
   ## start_loc and end_loc
-  start_loc <- (arrayid-1)*10e6 + jobs_num$start_loc[chr]
-  end_loc <- start_loc + 10e6 - 1
+  start_loc <- (arrayid-1)*7.5e6 + jobs_num$start_loc[chr]
+  end_loc <- start_loc + 7.5e6 - 1
   end_loc <- min(end_loc,jobs_num$end_loc[chr])
 
   ## sub-sequence num
@@ -951,7 +969,7 @@ if(test.type == "Null") {
   sub_seq_id <- 1:sub_seq_num
 
   individual_analysis_dnanexus <- function(kk,chr,start_loc,end_loc,genofile,obj_nullmodel,mac_cutoff,subset_variants_num,
-                                           QC_label,variant_type,geno_missing_imputation)
+                                           QC_label,variant_type,geno_missing_imputation,p_filter_cutoff)
   {
     start_loc_sub <- start_loc + 0.25e6*(kk-1)
     end_loc_sub <- start_loc_sub + 0.25e6 - 1
@@ -959,11 +977,9 @@ if(test.type == "Null") {
     end_loc_sub <- min(end_loc_sub,end_loc)
     
     results <- try(Individual_Analysis(chr=chr,start_loc=start_loc_sub,end_loc=end_loc_sub,genofile=genofile,obj_nullmodel=obj_nullmodel,mac_cutoff=mac_cutoff,subset_variants_num=subset_variants_num,
-                                       QC_label=QC_label,variant_type=variant_type,geno_missing_imputation=geno_missing_imputation))
+                                       QC_label=QC_label,variant_type=variant_type,geno_missing_imputation=geno_missing_imputation,p_filter_cutoff=p_filter_cutoff))
     return(list(index=kk,results=results))
   }
-  
-  subset_variants_num <- 5e3
   
   retry_mclapply <- function(sub_seq_id, user_cores, max_iter = 10) 
   {
@@ -975,7 +991,7 @@ if(test.type == "Null") {
       message(paste0("Iteration ", iter, ": Running with ", current_cores, " cores. Remaining tasks: ", length(sub_seq_id)))
       
       tmp_out <- mclapply(sub_seq_id,individual_analysis_dnanexus,chr=chr,start_loc=start_loc,end_loc=end_loc,genofile=genofile,obj_nullmodel=nullobj,mac_cutoff=min.mac,subset_variants_num=subset_variants_num,
-                          QC_label=QC_label,variant_type=variant_type,geno_missing_imputation=geno_missing_imputation,mc.cores=current_cores)
+                          QC_label=QC_label,variant_type=variant_type,geno_missing_imputation=geno_missing_imputation,p_filter_cutoff=p_filter_cutoff,mc.cores=current_cores)
       gc()
       
       # Filter out NULL components and add results to the output
